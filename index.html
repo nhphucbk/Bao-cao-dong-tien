@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STELLA360 - Dashboard Dòng Tiền Dự Án</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<style>
+  :root{
+    --primary:#1E40AF; --secondary:#0EA5E9; --accent:#F59E0B;
+    --success:#10B981; --danger:#EF4444; --bg:#F8FAFC;
+    --ink:#0F172A; --muted:#64748B; --card:#FFFFFF; --border:#E2E8F0;
+  }
+  *{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+  body{background:var(--bg); color:var(--ink);}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .kpi-value{font-variant-numeric:tabular-nums;}
+  .badge{display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600;}
+  table.data-table thead th{position:sticky; top:0; background:#F1F5F9; z-index:1; cursor:pointer; user-select:none;}
+  table.data-table tbody tr:hover{background:#F8FAFC;}
+  table.data-table tbody tr:nth-child(even){background:#FCFDFE;}
+  ::-webkit-scrollbar{height:8px; width:8px;}
+  ::-webkit-scrollbar-thumb{background:#CBD5E1; border-radius:8px;}
+  .fade-in{animation:fadeIn .4s ease-out;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+  .chip-btn{transition:all .15s ease;}
+  .chip-btn.active{background:var(--primary); color:#fff;}
+  @media print{
+    .no-print{display:none !important;}
+    body{background:#fff;}
+    .card{box-shadow:none; border:1px solid #ddd;}
+  }
+</style>
+</head>
+<body>
+
+<div class="max-w-[1440px] mx-auto px-4 md:px-8 py-6">
+
+  <!-- HEADER -->
+  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <div>
+      <div class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Công ty CP Đầu Tư Xây Dựng Vitecons</div>
+      <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mt-1">Dashboard Dòng Tiền Dự Án — STELLA360</h1>
+      <div class="text-sm text-slate-500 mt-1">Chung cư Ngôi Sao 360 · Thu (IPC/CĐT) đến 21/06/2026 · Giá trị hợp đồng Chi (NCC/NTP) đến 21/06/2026 · Công nợ phải trả theo Kế hoạch thanh toán 26/06/2026</div>
+    </div>
+    <div class="flex gap-2 no-print">
+      <button onclick="window.print()" class="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium flex items-center gap-2">
+        🖨️ In / Xuất PDF
+      </button>
+      <button id="btnExportCsv" class="px-4 py-2 rounded-lg text-white text-sm font-medium" style="background:var(--primary)">
+        ⬇️ Xuất CSV (bảng NCC/NTP)
+      </button>
+    </div>
+  </header>
+
+  <!-- INSIGHTS -->
+  <div class="card p-5 mb-6 fade-in" style="border-left:4px solid var(--accent)">
+    <div class="text-sm font-semibold text-slate-700 mb-2">💡 Nhận định nhanh</div>
+    <ul id="insightList" class="space-y-1.5 text-[15px] text-slate-700 list-disc pl-5"></ul>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+    <div class="card p-4">
+      <div class="text-xs text-slate-500 font-medium">Tổng THU (đã nhận từ CĐT)</div>
+      <div id="kpiThu" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--success)">-</div>
+      <div class="text-[11px] text-slate-400 mt-1">Lũy kế các đợt IPC đã thanh toán</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-xs text-slate-500 font-medium">Tổng CHI (đã trả NCC/NTP)</div>
+      <div id="kpiChi" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--danger)">-</div>
+      <div class="text-[11px] text-slate-400 mt-1">Lũy kế đến 21/06/2026</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-xs text-slate-500 font-medium">Tồn quỹ lũy kế (Thu − Chi)</div>
+      <div id="kpiTon" class="kpi-value text-xl md:text-2xl font-bold mt-1">-</div>
+      <div class="text-[11px] text-slate-400 mt-1">Âm = đang bù bằng vốn khác</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-xs text-slate-500 font-medium">Còn phải THU theo HĐ</div>
+      <div id="kpiConThu" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--secondary)">-</div>
+      <div class="text-[11px] text-slate-400 mt-1">Các đợt IPC chưa được CĐT chi trả</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-xs text-slate-500 font-medium">Công nợ phải trả hiện tại</div>
+      <div id="kpiConChi" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--danger)">-</div>
+      <div class="text-[11px] text-slate-400 mt-1">Hoá đơn/bill đã phát sinh, đến hạn TT (26/06/2026)</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-xs text-slate-500 font-medium">Dự trù Chi T7+T8/2026</div>
+      <div id="kpiDuTru" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--primary)">-</div>
+      <div class="text-[11px] text-slate-400 mt-1">Kế hoạch thanh toán 2 tháng tới</div>
+    </div>
+  </div>
+
+  <!-- VỊ TRÍ 1: CHARTS ROW 1 -->
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-6">
+    <div class="card p-5 xl:col-span-8">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-800">Dòng tiền THU theo tháng — Đề nghị vs Đã thu (lũy kế)</h3>
+        <span class="text-[11px] text-slate-400">Nguồn: Bảng theo dõi Claim thanh toán IPC · Đơn vị: tỷ đồng</span>
+      </div>
+      <canvas id="chartThu" height="110"></canvas>
+    </div>
+    <div class="card p-5 xl:col-span-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-800">Cơ cấu CHI đã thanh toán theo nhóm</h3>
+      </div>
+      <canvas id="chartCoCau" height="230"></canvas>
+    </div>
+  </div>
+
+  <!-- VỊ TRÍ 2: TABLE THU IPC -->
+  <div class="card p-5 mb-6">
+    <h3 class="font-semibold text-slate-800 mb-3">Lịch trình Thu theo đợt IPC (Chủ đầu tư)</h3>
+    <div class="overflow-x-auto max-h-[420px] overflow-y-auto border border-slate-100 rounded-lg">
+      <table class="data-table w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-600">
+            <th class="px-3 py-2">Đợt</th>
+            <th class="px-3 py-2">Tháng</th>
+            <th class="px-3 py-2 text-right">Giá trị đề nghị TT</th>
+            <th class="px-3 py-2 text-right">Đã thu</th>
+            <th class="px-3 py-2 text-center">Trạng thái</th>
+            <th class="px-3 py-2">Ghi chú</th>
+          </tr>
+        </thead>
+        <tbody id="thuTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VỊ TRÍ 3: CHARTS ROW 2 -->
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-6">
+    <div class="card p-5 xl:col-span-4">
+      <h3 class="font-semibold text-slate-800 mb-3">Dự phóng Thu vs Chi — T7 &amp; T8/2026</h3>
+      <canvas id="chartDuPhong" height="230"></canvas>
+    </div>
+    <div class="card p-5 xl:col-span-4">
+      <h3 class="font-semibold text-slate-800 mb-3">Phần Kết cấu vs Phần MEP (đã trả / còn lại theo HĐ)</h3>
+      <canvas id="chartKetCauMep" height="230"></canvas>
+    </div>
+    <div class="card p-5 xl:col-span-4">
+      <h3 class="font-semibold text-slate-800 mb-3">Top 10 công nợ đến hạn lớn nhất</h3>
+      <div class="text-[11px] text-slate-400 -mt-2 mb-2">Theo Kế hoạch thanh toán 26/06/2026</div>
+      <canvas id="chartTopNo" height="230"></canvas>
+    </div>
+  </div>
+
+  <!-- VỊ TRÍ 4: FILTER BAR -->
+  <div class="card p-4 mb-6 flex flex-wrap items-center gap-3 no-print">
+    <span class="text-sm font-semibold text-slate-600">Lọc theo nhóm chi phí:</span>
+    <div id="groupFilterWrap" class="flex flex-wrap gap-2"></div>
+    <div class="ml-auto flex items-center gap-2">
+      <input id="searchBox" type="text" placeholder="🔍 Tìm nhà thầu / NCC..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2" style="--tw-ring-color:var(--secondary)">
+      <button id="btnReset" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- TABLE: CHI VENDORS -->
+  <div class="card p-5 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-slate-800">Chi tiết theo hợp đồng — Nhà thầu phụ / Nhà cung cấp</h3>
+      <span id="vendorCount" class="text-xs text-slate-400"></span>
+    </div>
+    <div class="overflow-x-auto max-h-[480px] overflow-y-auto border border-slate-100 rounded-lg">
+      <table class="data-table w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-600">
+            <th class="px-3 py-2" data-sort="ten">Nhà thầu phụ / NCC</th>
+            <th class="px-3 py-2" data-sort="nhom">Nhóm</th>
+            <th class="px-3 py-2 text-right" data-sort="gia_tri_hd">Giá trị HĐ</th>
+            <th class="px-3 py-2 text-right" data-sort="da_tt">Đã thanh toán</th>
+            <th class="px-3 py-2 text-right" data-sort="con_lai">Còn lại theo HĐ*</th>
+            <th class="px-3 py-2 text-right" data-sort="du_tru_t7">Dự trù T7</th>
+            <th class="px-3 py-2 text-right" data-sort="du_tru_t8">Dự trù T8</th>
+            <th class="px-3 py-2">Ghi chú / Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody id="vendorTbody"></tbody>
+      </table>
+    </div>
+    <div class="text-[11px] text-slate-400 mt-2">* "Còn lại theo HĐ" là phần giá trị hợp đồng CHƯA lập hoá đơn/bill (chưa đến hạn ghi nhận), <b>không phải</b> công nợ phải trả hiện tại. Xem số công nợ thực tế đã phát sinh, đến hạn thanh toán tại bảng "Công nợ phải trả đến hạn" bên dưới.</div>
+  </div>
+
+  <!-- TABLE: CONG NO -->
+  <div class="card p-5 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-slate-800">Công nợ phải trả đến hạn — Kế hoạch thanh toán 26/06/2026</h3>
+      <span id="congNoCount" class="text-xs text-slate-400"></span>
+    </div>
+    <div class="text-[13px] text-slate-500 mb-3">Danh sách hoá đơn/bill đã phát sinh (TK 3311 — Phải trả người bán), thực sự đang nợ và chờ thanh toán — khác với "Còn lại theo HĐ" ở bảng trên (là phần hợp đồng chưa xuất hoá đơn). Bấm vào từng nhóm để xem chi tiết.</div>
+    <div class="flex flex-wrap gap-2 mb-4 no-print">
+      <span class="text-sm font-semibold text-slate-600 self-center mr-1">Lọc theo ưu tiên:</span>
+      <div id="priorityFilterWrap" class="flex flex-wrap gap-2"></div>
+    </div>
+    <div class="overflow-x-auto max-h-[560px] overflow-y-auto border border-slate-100 rounded-lg">
+      <table class="data-table w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-600">
+            <th class="px-3 py-2 w-8"></th>
+            <th class="px-3 py-2">Đối tác</th>
+            <th class="px-3 py-2">Diễn giải</th>
+            <th class="px-3 py-2 text-right">Số tiền</th>
+            <th class="px-3 py-2">Ghi chú / Lý do</th>
+          </tr>
+        </thead>
+        <tbody id="congNoTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer class="text-center text-xs text-slate-400 py-6">
+    Dữ liệu tổng hợp từ "STELLA360_DU TRU DONG TIEN.xlsx" (Thu — Bảng Claim IPC), "STELLA360-VTC_THEO DOI NCC-NTP.xlsx" (giá trị theo hợp đồng — Chi/Còn lại theo HĐ) và "STELLA360_CONG NO.xlsx" (Công nợ phải trả thực tế — Kế hoạch thanh toán 26/06/2026). 100% số liệu thật, không giả lập.
+  </footer>
+</div>
+
+<script>
+/* ======================= RAW DATA (trích xuất trực tiếp từ 2 file Excel gốc) ======================= */
+const THU_ITEMS = [
+  {"ten":"IPC - Tạm ứng","thang":"2025-07-01","de_nghi":42463800000,"da_tt":42463800000,"ghi_chu":"Đã phát hành thư bảo lãnh gửi CĐT"},
+  {"ten":"IPC 01","thang":"2025-10-01","de_nghi":8852237917,"da_tt":8852237917,"ghi_chu":"Đang trình IPC qua CĐT"},
+  {"ten":"IPC 02","thang":"2025-11-01","de_nghi":4717781916,"da_tt":4717781916,"ghi_chu":""},
+  {"ten":"QT Giai đoạn","thang":"2025-11-01","de_nghi":0,"da_tt":891461157,"ghi_chu":"Quyết toán giai đoạn"},
+  {"ten":"IPC 03","thang":"2025-12-01","de_nghi":7933614859,"da_tt":7933614859,"ghi_chu":""},
+  {"ten":"IPC 04","thang":"2026-02-01","de_nghi":7138615161,"da_tt":0,"ghi_chu":"Chưa thanh toán — vì CĐT yêu cầu đổi pháp nhân mới"},
+  {"ten":"IPC 05","thang":"2026-04-01","de_nghi":17520365673,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 06","thang":"2026-05-01","de_nghi":14613717322,"da_tt":0,"ghi_chu":"BCH đã gửi hồ sơ tới BQLDA, chưa ký vì CĐT có chủ trương chuyển pháp nhân mới"},
+  {"ten":"IPC 07","thang":"2026-06-01","de_nghi":5450670760,"da_tt":0,"ghi_chu":"BCH gửi TVGS trình ký"},
+  {"ten":"IPC 08","thang":"2026-07-01","de_nghi":7410850059,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 09","thang":"2026-08-01","de_nghi":6003380889,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 10","thang":"2026-09-01","de_nghi":12318942414,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 11","thang":"2026-10-01","de_nghi":27491529026,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 12","thang":"2026-11-01","de_nghi":38761336037,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 13","thang":"2026-12-01","de_nghi":26886550706,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 14","thang":"2027-01-01","de_nghi":36405725188,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 15","thang":"2027-02-01","de_nghi":8379283523,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 16","thang":"2027-03-01","de_nghi":2813927574,"da_tt":0,"ghi_chu":""},
+  {"ten":"IPC 17","thang":"2027-04-01","de_nghi":3094975,"da_tt":0,"ghi_chu":""}
+];
+
+const CHI_CATEGORIES = {
+  grand:{ten:"TỔNG THANH TOÁN XD + HT + MEP", da_tt:96219638541, con_lai:130130382335, t7:5204306089, t8:7663457431},
+  A_ketcau:{ten:"PHẦN KẾT CẤU", da_tt:80553473138, con_lai:75798619574, t7:3554306089, t8:3841574231},
+  B_mep:{ten:"PHẦN MEP", da_tt:15666165403, con_lai:54331762761, t7:1650000000, t8:3821883200}
+};
+
+const CHI_VENDORS = [
+{"ten":"ĐẶNG BÍCH NGỌC","nhom":"Dịch vụ","gia_tri_hd":245000000,"da_tt":203000000,"con_lai":42000000,"trang_thai":"","du_tru_t7":14000000,"du_tru_t8":14000000},
+{"ten":"CÔNG TY TNHH TM-DV ÂU PHÁT THÀNH","nhom":"Dịch vụ","gia_tri_hd":56118096,"da_tt":40176778,"con_lai":15941318,"trang_thai":"Dự trù chi phí trung bình hàng tháng","du_tru_t7":2700000,"du_tru_t8":2700000},
+{"ten":"CÔNG TY TNHH DỊCH VỤ BẢO VỆ HOÀNG THIÊN HƯNG","nhom":"Dịch vụ","gia_tri_hd":868320000,"da_tt":258227834,"con_lai":610092166,"trang_thai":"","du_tru_t7":22000000,"du_tru_t8":22000000},
+{"ten":"CÔNG TY TNHH GIAO NHẬN VẬN TẢI RỒNG Á CHÂU","nhom":"Dịch vụ","gia_tri_hd":673920000,"da_tt":235440000,"con_lai":438480000,"trang_thai":"Đang lên hồ sơ quyết toán","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH XD VÀ DV GOLDEN CHANCE","nhom":"Dịch vụ","gia_tri_hd":123120000,"da_tt":123120000,"con_lai":0,"trang_thai":"Quyết toán","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH MTV CƠ KHÍ XÂY DỰNG TM VÀ DV TUẤN TẠO","nhom":"Dịch vụ","gia_tri_hd":639360000,"da_tt":400642875,"con_lai":238717125,"trang_thai":"Đang lên hồ sơ quyết toán","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY CỔ PHẦN HAI BỐN BẢY","nhom":"Dịch vụ","gia_tri_hd":0,"da_tt":4168148,"con_lai":0,"trang_thai":"","du_tru_t7":500000,"du_tru_t8":500000},
+{"ten":"CÔNG TY TNHH FC LOGISTICS","nhom":"Dịch vụ","gia_tri_hd":438480000,"da_tt":382487400,"con_lai":55992600,"trang_thai":"Chuyển trả thiết bị bao che kho VTC/HDC/Hà Minh","du_tru_t7":0,"du_tru_t8":234132498},
+{"ten":"CÔNG TY CỔ PHẦN ĐÔ THỊ CẦN THƠ","nhom":"Dịch vụ","gia_tri_hd":20329920,"da_tt":20329920,"con_lai":0,"trang_thai":"Đã thanh toán đầy đủ theo HĐ","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CHI PHÍ CÔNG TRÌNH","nhom":"Dịch vụ","gia_tri_hd":0,"da_tt":451230726,"con_lai":0,"trang_thai":"","du_tru_t7":35000000,"du_tru_t8":35000000},
+{"ten":"CÔNG TY TNHH DV KỸ THUẬT VÀ TB TRẮC ĐỊA MIỀN NAM","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":106488000,"da_tt":45532800,"con_lai":60955200,"trang_thai":"Quyết toán","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH MTV DV THƯƠNG MẠI TIA CHỚP","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":54000000,"da_tt":42292600,"con_lai":11707400,"trang_thai":"Dự trù văn phòng phẩm","du_tru_t7":4000000,"du_tru_t8":4000000},
+{"ten":"CÔNG TY CỔ PHẦN SIÊU THỊ VLXD THẾ GIỚI NHÀ","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":10800000000,"da_tt":5356016000,"con_lai":5443984000,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH SEOUL","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":1580374800,"da_tt":1086526800,"con_lai":493848000,"trang_thai":"Thuê cẩu tháp + thân + gông + bảo trì","du_tru_t7":111500000,"du_tru_t8":275750000},
+{"ten":"CÔNG TY CỔ PHẦN ĐẦU TƯ SẢN XUẤT THƯƠNG MẠI HÀ MINH","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":3197556216,"da_tt":1243696064,"con_lai":1953860152,"trang_thai":"Chi phí thuê + xe chuyển trả thiết bị","du_tru_t7":73287584,"du_tru_t8":65986275},
+{"ten":"CÔNG TY CỔ PHẦN THIẾT BỊ TRẦN GIA GROUP","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":1117452931,"da_tt":686682560,"con_lai":430770371,"trang_thai":"Chi phí trung bình hàng tháng","du_tru_t7":79581690,"du_tru_t8":79581690},
+{"ten":"CÔNG TY CỔ PHẦN BÊ TÔNG TÂY ĐÔ","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":10800000000,"da_tt":1478059800,"con_lai":9321940200,"trang_thai":"Đã duyệt","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY CỔ PHẦN BÊ TÔNG HAMACO","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":10800000000,"da_tt":12419574800,"con_lai":-1619574800,"trang_thai":"Đã duyệt","du_tru_t7":535113000,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH MTV TM DV LINH PHƯỢNG","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":1080000000,"da_tt":581748226,"con_lai":498251774,"trang_thai":"Khối lượng dự trù nhập xi măng xây tường đến tầng 6","du_tru_t7":58000000,"du_tru_t8":58000000},
+{"ten":"CÔNG TY TNHH AKATI WOOD (VIỆT NAM)","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":1922508000,"da_tt":1301378400,"con_lai":621129600,"trang_thai":"Đã up PMS","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH HDAL VIỆT NAM","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":2906386056,"da_tt":2906386056,"con_lai":0,"trang_thai":"Đã up PMS","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH TM VLXD VÀ DV VẬN TẢI BÍCH HUYỀN","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":1074540350,"da_tt":630719536,"con_lai":443820814,"trang_thai":"Khối lượng dự trù nhập gạch đất sét nung đến tầng 6","du_tru_t7":64500000,"du_tru_t8":64500000},
+{"ten":"CÔNG TY TNHH DỊCH VỤ CHO THUÊ SUNTECH","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":7776000,"da_tt":3855600,"con_lai":3920400,"trang_thai":"Đã up PMS","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH MTV KIẾN TRÚC XÂY DỰNG ONG VÀNG","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":1153811520,"da_tt":495918319,"con_lai":657893201,"trang_thai":"Khối lượng dự trù nhập gạch không nung đến tầng 6","du_tru_t7":153915000,"du_tru_t8":153915000},
+{"ten":"CÔNG TY TNHH MTV ĐẠI HOÀNG ĐÔNG","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":0,"da_tt":372620000,"con_lai":-372620000,"trang_thai":"Khối lượng dự trù nhập vật tư xây, tô đến tầng 6","du_tru_t7":90040701,"du_tru_t8":90040701},
+{"ten":"CÔNG TY TNHH TM DV MXD BẢO THỊNH","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":287280000,"da_tt":116640000,"con_lai":170640000,"trang_thai":"Chi phí lắp gông nâng đốt vận thang DAHAN + bảo trì định kỳ","du_tru_t7":12000000,"du_tru_t8":12000000},
+{"ten":"EVNSPC - ĐỘI QL ĐIỆN BÌNH THỦY","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":0,"da_tt":173771071,"con_lai":173771071,"trang_thai":"","du_tru_t7":22000000,"du_tru_t8":22000000},
+{"ten":"CÔNG TY CỔ PHẦN CẤP NƯỚC CẦN THƠ 2","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":0,"da_tt":39828485,"con_lai":39828485,"trang_thai":"","du_tru_t7":5000000,"du_tru_t8":5000000},
+{"ten":"CÔNG TY TNHH KINH DOANH THƯƠNG MẠI HDC","nhom":"Nhà cung cấp (Kết cấu)","gia_tri_hd":85707072,"da_tt":33102973,"con_lai":52604099,"trang_thai":"Thay thế NCC Trần Gia nhập giáo H bao che","du_tru_t7":21023920,"du_tru_t8":21023920},
+{"ten":"CÔNG TY TNHH XD TM DV TRÌNH HUY","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":12261803760,"da_tt":10097114754,"con_lai":2164689006,"trang_thai":"Đổi sang pháp nhân mới Kiến Tạo Build","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH XD TM DV KIẾN TẠO BUILD","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":0,"da_tt":0,"con_lai":0,"trang_thai":"Pháp nhân kế thừa Trình Huy","du_tru_t7":734174183,"du_tru_t8":569140356},
+{"ten":"ĐTC BÙI VĂN HẾT","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":0,"da_tt":0,"con_lai":0,"trang_thai":"KL thanh toán từ T17 đến tầng tum kỹ thuật","du_tru_t7":93754981,"du_tru_t8":64986615},
+{"ten":"CHI PHÍ BCH (công nhật, vận thăng, hốt xà bần)","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":0,"da_tt":0,"con_lai":0,"trang_thai":"Thanh toán nhân công tháng 5","du_tru_t7":55000000,"du_tru_t8":55000000},
+{"ten":"HỖ TRỢ 7% HÓA ĐƠN CHO NTP TRÌNH HUY","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":0,"da_tt":0,"con_lai":0,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"HKD PHẠM VĂN TUẤN","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":1888683599,"da_tt":154008455,"con_lai":1734675144,"trang_thai":"Đội thi công đã rút khỏi dự án","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"HKD TRẦN MINH HẬN","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":2422677276,"da_tt":1631002969,"con_lai":791674307,"trang_thai":"KL thanh toán cột, vách, cầu thang T16→T17 + dầm sàn T17","du_tru_t7":240000000,"du_tru_t8":79581690},
+{"ten":"HKD LÊ VĂN HOÀNG CONS","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":1918801570,"da_tt":1575280381,"con_lai":343521189,"trang_thai":"KL thanh toán dầm sàn T18 + cột vách cầu thang T18→tum","du_tru_t7":6000000,"du_tru_t8":100000000},
+{"ten":"CÔNG TY TNHH XÂY DỰNG VẠN PHÁT THÀNH","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":825755040,"da_tt":704578202,"con_lai":121176838,"trang_thai":"KL thanh toán cột vách cầu thang T16→T17 + dầm sàn T17→T18","du_tru_t7":45000000,"du_tru_t8":45000000},
+{"ten":"CÔNG TY CỔ PHẦN KIỂM ĐỊNH CÔNG TRÌNH 510","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":162000000,"da_tt":103079520,"con_lai":58920480,"trang_thai":"Thanh toán TN vật liệu + KQTN nén R28","du_tru_t7":47200000,"du_tru_t8":47200000},
+{"ten":"CÔNG TY TNHH TM LẮP ĐẶT XÂY DỰNG GIA HUY","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":392785200,"da_tt":533459186,"con_lai":-140673986,"trang_thai":"Chi phí lái + phụ cẩu, T7 tháo cẩu quyết toán","du_tru_t7":62000000,"du_tru_t8":62000000},
+{"ten":"CÔNG TY TNHH PHÚC TRƯỜNG VŨ","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":804279240,"da_tt":536918906,"con_lai":267360334,"trang_thai":"Đổi pháp nhân mới VLXD Ngọc Hải","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH KINH DOANH VLXD NGỌC HẢI","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":1257240420,"da_tt":206965171,"con_lai":1050275249,"trang_thai":"KL thanh toán T15→T17","du_tru_t7":85000000,"du_tru_t8":0},
+{"ten":"CÔNG TY CỔ PHẦN XÂY DỰNG KIM HUY","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":3033908024,"da_tt":0,"con_lai":3033908024,"trang_thai":"T7: Sika waterbar hồ bơi T4; T8: chống thấm mái","du_tru_t7":9720000,"du_tru_t8":9720000},
+{"ten":"CÔNG TY TNHH TƯ VẤN XD & ĐT NGUYỄN MINH","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":348559200,"da_tt":225812340,"con_lai":122746860,"trang_thai":"Quan trắc lún + nghiêng đợt 3","du_tru_t7":0,"du_tru_t8":73974600},
+{"ten":"CÔNG TY TNHH MTV XD-TM & DV THẠCH ÚT","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":502073100,"da_tt":226642925,"con_lai":275430175,"trang_thai":"Thi công Defect - sàn 15-18+KT+mái","du_tru_t7":75000000,"du_tru_t8":75000000},
+{"ten":"CÔNG TY TNHH XÂY DỰNG VIỆT KHOA","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":17202856747,"da_tt":666691281,"con_lai":16536165466,"trang_thai":"KL xây T3 + khối lượng còn lại T1+T2","du_tru_t7":0,"du_tru_t8":1356250271},
+{"ten":"CÔNG TY TNHH ĐO ĐẠC TM XD MINH LONG","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":1251470753,"da_tt":466713427,"con_lai":784757326,"trang_thai":"Thi công trắc đạc tháng 4+5","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"TRUNG TÂM NGHIÊN CỨU VÀ TƯ VẤN MÔI TRƯỜNG","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":24127200,"da_tt":24127200,"con_lai":0,"trang_thai":"Chu kỳ cuối quan trắc môi trường","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH VINCI VINA (cửa chống cháy)","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":7749224910,"da_tt":1435041650,"con_lai":6314183260,"trang_thai":"Gửi email thông báo tăng giá","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY CỔ PHẦN XÂY DỰNG TECHCONS","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":4273746483,"da_tt":593575900,"con_lai":3680170583,"trang_thai":"Gửi email thông báo tăng giá","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH XD TM TRANG TRÍ NỘI THẤT PHÚC KHANG","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":3415251218,"da_tt":0,"con_lai":3415251218,"trang_thai":"NTP không tham gia dự án","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH SÀI GÒN NHÔM KÍNH","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":9107747091,"da_tt":0,"con_lai":9107747091,"trang_thai":"Gửi email thông báo tăng giá","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY CP NHÔM KÍNH VÀ ĐẦU TƯ TRƯỜNG GIANG","nhom":"Nhà thầu phụ (Kết cấu)","gia_tri_hd":6348687834,"da_tt":0,"con_lai":6348687834,"trang_thai":"Gửi email thông báo tăng giá","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY CỔ PHẦN TM DV CC1 (thép)","nhom":"HĐ nguyên tắc và khác","gia_tri_hd":0,"da_tt":8636434950,"con_lai":0,"trang_thai":"Chưa thanh toán xong bill Đ4","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY CỔ PHẦN TM THÉP INDECO","nhom":"HĐ nguyên tắc và khác","gia_tri_hd":0,"da_tt":16375470474,"con_lai":0,"trang_thai":"Chưa thanh toán bill Đ8, Đ9, Đ10","du_tru_t7":607502148,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH KỸ THUẬT DV LISOTECS","nhom":"HĐ nguyên tắc và khác","gia_tri_hd":0,"da_tt":157083385,"con_lai":0,"trang_thai":"Chưa thanh toán tiền thuê T3,T4,T5","du_tru_t7":3500000,"du_tru_t8":3500000},
+{"ten":"CÔNG TY TNHH TM DV XÂY DỰNG ESOL","nhom":"HĐ nguyên tắc và khác","gia_tri_hd":0,"da_tt":758063634,"con_lai":0,"trang_thai":"Dự trù VTP bao che","du_tru_t7":17433900,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH XD TM GIA THÀNH","nhom":"HĐ nguyên tắc và khác","gia_tri_hd":0,"da_tt":874275700,"con_lai":0,"trang_thai":"Chưa thanh toán bill Đ4+Đ5","du_tru_t7":75104000,"du_tru_t8":75104000},
+{"ten":"CÔNG TY CỔ PHẦN XD VÀ TM HÀ NỘI TRẺ","nhom":"HĐ nguyên tắc và khác","gia_tri_hd":0,"da_tt":354659617,"con_lai":0,"trang_thai":"BCH khấu trừ NTP/ĐTC: 129,272,740","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH SÁU LU (thép)","nhom":"HĐ nguyên tắc và khác","gia_tri_hd":0,"da_tt":3083299340,"con_lai":0,"trang_thai":"P. Kế toán gửi bill","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH KƠ NIA","nhom":"Nhà cung cấp (MEP)","gia_tri_hd":2038614480,"da_tt":188760600,"con_lai":1849853880,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH AGIZA VIỆT NAM","nhom":"Nhà cung cấp (MEP)","gia_tri_hd":1713182400,"da_tt":237942000,"con_lai":1475240400,"trang_thai":"Bơm PCCC/CTN - hàng về dự án 26/06/2026","du_tru_t7":0,"du_tru_t8":1237298400},
+{"ten":"CÔNG TY CỔ PHẦN KỸ THUẬT VÀ TM FAS","nhom":"Nhà cung cấp (MEP)","gia_tri_hd":1199179300,"da_tt":163524450,"con_lai":1035654850,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH TM DV HỒNG THUYÊN","nhom":"Nhà cung cấp (MEP)","gia_tri_hd":2162433256,"da_tt":200225302,"con_lai":1962207954,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH KỸ THUẬT DUY HẢO","nhom":"Nhà cung cấp (MEP)","gia_tri_hd":2580441840,"da_tt":238929800,"con_lai":2341512040,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY CP SX-XD-TM ĐÔNG NAM Á (quạt Kruger)","nhom":"Nhà cung cấp (MEP)","gia_tri_hd":1625626800,"da_tt":150521000,"con_lai":1475105800,"trang_thai":"Hàng đã nhập, đã nghiệm thu","du_tru_t7":0,"du_tru_t8":1324584800},
+{"ten":"CÔNG TY CP TM VẬT LIỆU ĐIỆN NAM HÀ NỘI","nhom":"Nhà cung cấp (MEP)","gia_tri_hd":0,"da_tt":1176221687,"con_lai":0,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH XÂY LẮP CƠ ĐIỆN VIỆT PHAN","nhom":"Nhà thầu phụ (MEP)","gia_tri_hd":1693332836,"da_tt":716184085,"con_lai":977148751,"trang_thai":"Điện nước tạm, trực điện T5-T6","du_tru_t7":90000000,"du_tru_t8":80000000},
+{"ten":"CÔNG TY CP TM VÀ KT ĐIỆN MIỀN TRUNG","nhom":"Nhà thầu phụ (MEP)","gia_tri_hd":18036000000,"da_tt":4469483242,"con_lai":13566516758,"trang_thai":"Ống âm sàn + thang máng cáp T8-T15","du_tru_t7":850000000,"du_tru_t8":450000000},
+{"ten":"CÔNG TY CỔ PHẦN KỸ THUẬT HÀN VIỆT","nhom":"Nhà thầu phụ (MEP)","gia_tri_hd":8316124140,"da_tt":1432048507,"con_lai":6884075633,"trang_thai":"Sleeve xuyên sàn + ống gió","du_tru_t7":120000000,"du_tru_t8":150000000},
+{"ten":"CÔNG TY TNHH KT NGUỒN NĂNG LƯỢNG ĐẠI VIỆT","nhom":"Nhà thầu phụ (MEP)","gia_tri_hd":12090010320,"da_tt":3214755794,"con_lai":8875254526,"trang_thai":"Sleeve xuyên sàn + ống CTN","du_tru_t7":280000000,"du_tru_t8":300000000},
+{"ten":"CÔNG TY TNHH THIẾT BỊ PCCC 2-9","nhom":"Nhà thầu phụ (MEP)","gia_tri_hd":13645150729,"da_tt":2960678606,"con_lai":10684472123,"trang_thai":"Ống âm sàn + ống chữa cháy","du_tru_t7":310000000,"du_tru_t8":280000000},
+{"ten":"CÔNG TY TNHH VINCI VINA (hồ bơi)","nhom":"Nhà thầu phụ (MEP)","gia_tri_hd":2083356216,"da_tt":289355030,"con_lai":1794001186,"trang_thai":"","du_tru_t7":0,"du_tru_t8":0},
+{"ten":"CÔNG TY TNHH TM XD KT MÔI TRƯỜNG TD","nhom":"Nhà thầu phụ (MEP)","gia_tri_hd":1638254160,"da_tt":227535300,"con_lai":1410718860,"trang_thai":"Hệ thống xử lý nước thải","du_tru_t7":0,"du_tru_t8":0}
+];
+
+// Công nợ phải trả THỰC TẾ đến hạn — trích từ "STELLA360_CONG NO.xlsx" (Kế hoạch thanh toán 26/06/2026)
+// Đây là hoá đơn/bill ĐÃ PHÁT SINH (TK 3311) và đang chờ thanh toán — khác với "con_lai" ở trên (giá trị HĐ CHƯA xuất hoá đơn)
+const VENDOR_NAME_MAP = {
+  XDTECHCONS:"CÔNG TY CỔ PHẦN XÂY DỰNG TECHCONS", VINCI:"CÔNG TY TNHH VINCI VINA",
+  TMHAMINH:"CÔNG TY CỔ PHẦN ĐT SX TM HÀ MINH", THEGIOINHA:"CÔNG TY CP SIÊU THỊ VLXD THẾ GIỚI NHÀ",
+  NANGLUONGDAIVIET:"CÔNG TY TNHH KT NGUỒN NĂNG LƯỢNG ĐẠI VIỆT", LISOTECS:"CÔNG TY TNHH KT DV LISOTECS",
+  KTDMIENTRUNG:"CÔNG TY CP TM VÀ KT ĐIỆN MIỀN TRUNG", INDECO:"CÔNG TY CP TM THÉP INDECO",
+  HDC:"CÔNG TY TNHH KD TM HDC", HANVIET:"CÔNG TY CỔ PHẦN KỸ THUẬT HÀN VIỆT",
+  HAMACO:"CÔNG TY CỔ PHẦN BÊ TÔNG HAMACO", GIATHANH:"CÔNG TY TNHH XD TM GIA THÀNH",
+  CC1:"CÔNG TY CỔ PHẦN TM DV CC1", BAOTHINH:"CÔNG TY TNHH TM DV MXD BẢO THỊNH",
+  AUPHATTHANH:"CÔNG TY TNHH TM-DV ÂU PHÁT THÀNH", AKATIWOOD:"CÔNG TY TNHH AKATI WOOD (VN)",
+  FCLOGISTICS:"CÔNG TY TNHH FC LOGISTICS", MINHLONG:"CÔNG TY TNHH ĐO ĐẠC TM XD MINH LONG",
+  TMTIACHOP:"CÔNG TY TNHH MTV DV TM TIA CHỚP", HOANGDONG:"CÔNG TY TNHH MTV ĐẠI HOÀNG ĐÔNG",
+  PCCC29:"CÔNG TY TNHH THIẾT BỊ PCCC 2-9", SEOUL:"CÔNG TY TNHH SEOUL",
+  LINHPHUONG:"CÔNG TY TNHH MTV TM DV LINH PHƯỢNG", KIENTAOBUILD:"CÔNG TY TNHH XD TM DV KIẾN TẠO BUILD",
+  NHPHUC:"CHI PHÍ BCH (nội bộ)", VANPHATTHANH:"CÔNG TY TNHH XÂY DỰNG VẠN PHÁT THÀNH",
+  VLXDNGOCHAI:"CÔNG TY TNHH KD VLXD NGỌC HẢI", HOANGTHIENHUNG:"CÔNG TY TNHH DV BẢO VỆ HOÀNG THIÊN HƯNG",
+  GIAHUY:"CÔNG TY TNHH TM LẮP ĐẶT XD GIA HUY", NGUYENMINH:"CÔNG TY TNHH TV XD & ĐT NGUYỄN MINH",
+  TRANGIA:"CÔNG TY CỔ PHẦN THIẾT BỊ TRẦN GIA GROUP", HANOITRE:"CÔNG TY CP XD VÀ TM HÀ NỘI TRẺ",
+  CANTHO2:"CÔNG TY CỔ PHẦN CẤP NƯỚC CẦN THƠ 2"
+};
+const CONG_NO_ITEMS = [
+{"ma_dt":"XDTECHCONS","dien_giai":"TT tạm ứng CC vật tư và TC hoàn thiện đá","so_tien":593575900,"uu_tien":null,"note":""},
+{"ma_dt":"VINCI","dien_giai":"TT tạm ứng CC vật tư và TC cửa chống cháy","so_tien":1435041650,"uu_tien":null,"note":""},
+{"ma_dt":"TMHAMINH","dien_giai":"TT CP cho thuê thiết bị Ringlock đợt 9","so_tien":100890122,"uu_tien":1,"note":"Bill tháng 3/2026 - Quá hạn thanh toán"},
+{"ma_dt":"THEGIOINHA","dien_giai":"TT CP CC bê tông thương phẩm đợt 7","so_tien":2332955000,"uu_tien":2,"note":"Thanh toán 1 phần để NCC cung cấp BT đổ khối lượng kết cấu còn lại"},
+{"ma_dt":"NANGLUONGDAIVIET","dien_giai":"TT CC và TC lắp đặt hệ thống cấp thoát nước đợt 4","so_tien":260320227,"uu_tien":1,"note":"Quá hạn 17 ngày. Cần thanh toán để duy trì nhân công và nhập hàng hệ trục đứng"},
+{"ma_dt":"LISOTECS","dien_giai":"TT CP thuê container đợt 7","so_tien":3780000,"uu_tien":1,"note":"Bill tháng 3/2026 - Quá hạn thanh toán"},
+{"ma_dt":"KTDMIENTRUNG","dien_giai":"TT CC TC lắp đặt hệ thống điện đợt 5","so_tien":319387357,"uu_tien":1,"note":"Quá hạn 17 ngày. Cần thanh toán để duy trì nhân công và nhập hàng hệ trục đứng"},
+{"ma_dt":"INDECO","dien_giai":"TT CP CC thép xây dựng đợt 8","so_tien":1212433805,"uu_tien":2,"note":""},
+{"ma_dt":"HDC","dien_giai":"TT CC và cho thuê thiết bị chống sàn, bao che đợt 1","so_tien":13913575,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn thanh toán"},
+{"ma_dt":"HANVIET","dien_giai":"TT CP TC hệ thống HVAC đợt 5","so_tien":148769845,"uu_tien":1,"note":"Quá hạn 17 ngày. Cần thanh toán để duy trì nhân công và nhập hàng hệ trục đứng"},
+{"ma_dt":"HAMACO","dien_giai":"TT CP CC bê tông thương phẩm đợt 10","so_tien":564610000,"uu_tien":1,"note":"Thanh toán để NCC cung cấp BT đổ khối lượng kết cấu còn lại"},
+{"ma_dt":"GIATHANH","dien_giai":"TT CP CC vật tư phụ đợt 4","so_tien":81992600,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn thanh toán"},
+{"ma_dt":"CC1","dien_giai":"TT CP CC thép xây dựng đợt 4 (L2)","so_tien":1000000000,"uu_tien":1,"note":""},
+{"ma_dt":"BAOTHINH","dien_giai":"TT CP VC, lắp đặt thăng lồng đợt 3","so_tien":12960000,"uu_tien":1,"note":"Bill tháng 3-4/2026 - Quá hạn. Cần thanh toán để duy trì nhân sự nâng gông, bảo trì vận thăng"},
+{"ma_dt":"BAOTHINH","dien_giai":"TT CP VC, lắp đặt thăng lồng đợt 4","so_tien":9720000,"uu_tien":1,"note":""},
+{"ma_dt":"AUPHATTHANH","dien_giai":"TT CP thuê máy photocopy đợt 9","so_tien":2032301,"uu_tien":1,"note":"Bill tháng 3/2026 - Quá hạn thanh toán"},
+{"ma_dt":"AKATIWOOD","dien_giai":"TT CP CC ván phủ phim đợt 4","so_tien":184680000,"uu_tien":1,"note":"Quá hạn vì bill tháng 12/2025 và 01/2026 — NCC đã gửi công văn yêu cầu thanh toán"},
+{"ma_dt":"AKATIWOOD","dien_giai":"TT CP CC ván phủ phim đợt 5","so_tien":191700000,"uu_tien":1,"note":""},
+{"ma_dt":"FCLOGISTICS","dien_giai":"TT CP vận chuyển đợt 5","so_tien":106677000,"uu_tien":1,"note":"NCC đã gửi công văn yêu cầu thanh toán, nếu không sẽ ngưng vận chuyển hàng cho công trình"},
+{"ma_dt":"MINHLONG","dien_giai":"TT CP TC trắc đạc đợt 7","so_tien":58853727,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn. Cần thanh toán để định vị mực phần hoàn thiện"},
+{"ma_dt":"TMTIACHOP","dien_giai":"TT CP CC văn phòng phẩm đợt 6","so_tien":3433600,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn thanh toán"},
+{"ma_dt":"AUPHATTHANH","dien_giai":"TT CP thuê máy photocopy đợt 10","so_tien":1890000,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn thanh toán"},
+{"ma_dt":"HOANGDONG","dien_giai":"TT CP CC vật tư hoàn thiện đợt 5","so_tien":19690000,"uu_tien":1,"note":"Bill tháng 3/2026 - Quá hạn. Cần thanh toán để NCC nhập cát, đá"},
+{"ma_dt":"HOANGDONG","dien_giai":"TT CP CC vật tư hoàn thiện đợt 6","so_tien":20047500,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn. Cần thanh toán để NCC nhập cát, đá"},
+{"ma_dt":"PCCC29","dien_giai":"TT CC TC lắp đặt PCCC đợt 6","so_tien":344624622,"uu_tien":1,"note":"Quá hạn 2 ngày. Cần thanh toán để duy trì nhân công và nhập hàng hệ trục đứng"},
+{"ma_dt":"SEOUL","dien_giai":"TT CP CC và lắp đặt cẩu tháp đợt 10","so_tien":159994800,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn thanh toán"},
+{"ma_dt":"NANGLUONGDAIVIET","dien_giai":"TT CC và TC lắp đặt hệ thống cấp thoát nước đợt 5","so_tien":101409650,"uu_tien":2,"note":""},
+{"ma_dt":"LINHPHUONG","dien_giai":"TT CP CC vật tư đợt 8","so_tien":31200000,"uu_tien":1,"note":"Quá hạn. Cần thanh toán để nhập xi măng cho dự án"},
+{"ma_dt":"KIENTAOBUILD","dien_giai":"TT TC kết cấu phần thân đợt 1","so_tien":1106105674,"uu_tien":1,"note":"Bill tháng 5 - thanh toán cho NTP + ĐTC Út Hết và công nhật BCH"},
+{"ma_dt":"NHPHUC","dien_giai":"TT CP BCH kỳ 14","so_tien":32721170,"uu_tien":1,"note":"Chi phí BCH tháng 5"},
+{"ma_dt":"VANPHATTHANH","dien_giai":"TT CP thi công đổ bê tông đợt 14","so_tien":86404638,"uu_tien":1,"note":"Cần thanh toán để duy trì nhân công thi công bê tông"},
+{"ma_dt":"VLXDNGOCHAI","dien_giai":"TT TC công tác tạm và bao che, cơ khí đợt 2","so_tien":81623922,"uu_tien":1,"note":"Cần thanh toán để duy trì nhân công thi công bao che"},
+{"ma_dt":"HOANGTHIENHUNG","dien_giai":"TT CP dịch vụ bảo vệ đợt 11","so_tien":22296774,"uu_tien":1,"note":"Bill tháng 5/2026 - Cần thanh toán để duy trì chốt an ninh"},
+{"ma_dt":"INDECO","dien_giai":"TT CP CC thép xây dựng đợt 9","so_tien":1201795375,"uu_tien":2,"note":""},
+{"ma_dt":"KTDMIENTRUNG","dien_giai":"TT CC TC lắp đặt hệ thống điện đợt 6","so_tien":840234388,"uu_tien":2,"note":""},
+{"ma_dt":"HAMACO","dien_giai":"TT CP CC bê tông thương phẩm đợt 11","so_tien":1157912000,"uu_tien":2,"note":"Thanh toán 1 phần để NCC cung cấp BT đổ khối lượng kết cấu còn lại"},
+{"ma_dt":"GIAHUY","dien_giai":"TT CP vận hành cẩu tháp đợt 11","so_tien":53298000,"uu_tien":1,"note":"Bill tháng 5/2026 - Cần thanh toán để duy trì công nhân vận hành"},
+{"ma_dt":"NGUYENMINH","dien_giai":"TT CP quan trắc lún và nghiêng công trình đợt 3","so_tien":73974600,"uu_tien":1,"note":"Cần thanh toán để NTP xuất báo cáo quan trắc lún/nghiêng"},
+{"ma_dt":"TRANGIA","dien_giai":"TT CP vận chuyển & cho thuê giàn giáo bao che đợt 9","so_tien":79581690,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn thanh toán"},
+{"ma_dt":"HANOITRE","dien_giai":"TT CP cung cấp đồ BHLĐ đợt 4","so_tien":47512228,"uu_tien":1,"note":"Bill tháng 4/2026 - Quá hạn thanh toán"},
+{"ma_dt":"CANTHO2","dien_giai":"TT CP cung cấp nước sinh hoạt đợt 10","so_tien":4278952,"uu_tien":1,"note":"Ưu tiên thanh toán trước ngày 29/06/2026"}
+];
+
+/* ======================= HELPERS ======================= */
+Chart.register(ChartDataLabels);
+Chart.defaults.font.family = "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#475569';
+Chart.defaults.plugins.datalabels = { display:false }; // chỉ bật thủ công cho từng biểu đồ cần hiện %
+function fmtVND(n){
+  n = Math.round(n||0);
+  return n.toLocaleString('vi-VN') + ' đ';
+}
+function fmtCompact(n){
+  n = n||0;
+  const abs = Math.abs(n);
+  const sign = n<0 ? '-' : '';
+  if(abs >= 1e9) return sign + (abs/1e9).toLocaleString('vi-VN',{maximumFractionDigits:2}) + ' tỷ đ';
+  if(abs >= 1e6) return sign + (abs/1e6).toLocaleString('vi-VN',{maximumFractionDigits:1}) + ' triệu đ';
+  return fmtVND(n);
+}
+// Trục biểu đồ: chỉ hiện số theo đơn vị tỷ đồng (đơn vị ghi ở tiêu đề trục) — đúng quy ước báo cáo tài chính, tránh lặp lại đơn vị ở mỗi mốc
+function fmtAxisTy(n){
+  return (n/1e9).toLocaleString('vi-VN',{maximumFractionDigits:1});
+}
+function monthLabel(iso){
+  const d = new Date(iso+'T00:00:00');
+  return 'T'+(d.getMonth()+1)+'/'+d.getFullYear();
+}
+const COLORS = ['#0EA5E9','#1E40AF','#F59E0B','#10B981','#8B5CF6','#EF4444'];
+
+/* ======================= DERIVED DATA ======================= */
+const thuSorted = THU_ITEMS.slice().sort((a,b)=> new Date(a.thang) - new Date(b.thang));
+let cumThu = 0, cumDeNghi = 0;
+const thuChart = thuSorted.map(d=>{
+  cumThu += d.da_tt; cumDeNghi += d.de_nghi;
+  return {...d, cum_da_tt: cumThu, cum_de_nghi: cumDeNghi};
+});
+
+const totalThu = THU_ITEMS.reduce((s,d)=>s+d.da_tt,0);
+const totalDeNghi = THU_ITEMS.reduce((s,d)=>s+d.de_nghi,0);
+const conPhaiThu = totalDeNghi - totalThu;
+
+const grand = CHI_CATEGORIES.grand;
+const catA = CHI_CATEGORIES.A_ketcau;
+const catB = CHI_CATEGORIES.B_mep;
+const totalChi = grand.da_tt;
+const tonQuy = totalThu - totalChi;
+
+// group vendors bottom-up (nguồn số liệu chính xác nhất, đã đối chiếu khớp 100% với các mục con)
+const GROUP_ORDER = ["Dịch vụ","Nhà cung cấp (Kết cấu)","Nhà thầu phụ (Kết cấu)","HĐ nguyên tắc và khác","Nhà cung cấp (MEP)","Nhà thầu phụ (MEP)"];
+function groupVendors(list){
+  const map = {};
+  GROUP_ORDER.forEach(g=> map[g] = {nhom:g, da_tt:0, con_lai:0, du_tru_t7:0, du_tru_t8:0, count:0});
+  list.forEach(v=>{
+    if(!map[v.nhom]) map[v.nhom] = {nhom:v.nhom, da_tt:0, con_lai:0, du_tru_t7:0, du_tru_t8:0, count:0};
+    map[v.nhom].da_tt += v.da_tt;
+    map[v.nhom].con_lai += v.con_lai;
+    map[v.nhom].du_tru_t7 += v.du_tru_t7;
+    map[v.nhom].du_tru_t8 += v.du_tru_t8;
+    map[v.nhom].count += 1;
+  });
+  return GROUP_ORDER.map(g=>map[g]).filter(g=>g.count>0);
+}
+const groupTotals = groupVendors(CHI_VENDORS);
+
+const ipc08 = THU_ITEMS.find(d=>d.ten==='IPC 08'); // Tháng 7/2026
+const ipc09 = THU_ITEMS.find(d=>d.ten==='IPC 09'); // Tháng 8/2026
+
+// Công nợ phải trả THỰC TẾ (khác với "con_lai" - giá trị HĐ chưa xuất bill)
+const congNoTotal = CONG_NO_ITEMS.reduce((s,d)=>s+d.so_tien,0);
+const congNoP1 = CONG_NO_ITEMS.filter(d=>d.uu_tien===1).reduce((s,d)=>s+d.so_tien,0);
+const congNoP2 = CONG_NO_ITEMS.filter(d=>d.uu_tien===2).reduce((s,d)=>s+d.so_tien,0);
+const congNoChoDuyet = CONG_NO_ITEMS.filter(d=>d.uu_tien===null).reduce((s,d)=>s+d.so_tien,0);
+function groupCongNoByVendor(list){
+  const map = {};
+  list.forEach(d=>{
+    if(!map[d.ma_dt]) map[d.ma_dt] = {ma_dt:d.ma_dt, ten: VENDOR_NAME_MAP[d.ma_dt] || d.ma_dt, so_tien:0, count:0};
+    map[d.ma_dt].so_tien += d.so_tien;
+    map[d.ma_dt].count += 1;
+  });
+  return Object.values(map);
+}
+const congNoByVendor = groupCongNoByVendor(CONG_NO_ITEMS);
+const congNoTopVendor = congNoByVendor.slice().sort((a,b)=>b.so_tien-a.so_tien)[0];
+
+/* ======================= INSIGHTS ======================= */
+const insightList = document.getElementById('insightList');
+const insights = [
+  `Tính đến 21/06/2026, dự án đã <b>thu về ${fmtCompact(totalThu)}</b> từ Chủ đầu tư nhưng đã <b>chi trả ${fmtCompact(totalChi)}</b> cho các Nhà thầu phụ/NCC — dòng tiền lũy kế đang <b>${tonQuy<0?'âm':'dương'} ${fmtCompact(Math.abs(tonQuy))}</b>, phần chênh lệch này đang được công ty tài trợ bằng nguồn vốn khác.`,
+  `Còn <b>${fmtCompact(conPhaiThu)}</b> giá trị đã đề nghị thanh toán nhưng CĐT chưa chi trả, tập trung ở các đợt IPC04–IPC07 (đã quá hạn từ tháng 2 đến tháng 6/2026) do vướng thủ tục đổi pháp nhân và chờ CĐT phê duyệt hồ sơ.`,
+  `Phần Kết cấu chiếm <b>${(catA.da_tt/grand.da_tt*100).toFixed(1)}%</b> tổng chi đã thanh toán (${fmtCompact(catA.da_tt)}), trong khi Phần MEP mới chiếm <b>${(catB.da_tt/grand.da_tt*100).toFixed(1)}%</b> (${fmtCompact(catB.da_tt)}) — đúng với tiến độ thi công phần thô đang dẫn trước MEP.`,
+  `Dự trù chi 2 tháng tới (T7+T8/2026) khoảng <b>${fmtCompact(grand.t7+grand.t8)}</b>, trong khi Thu dự kiến cùng kỳ theo IPC08+IPC09 là <b>${fmtCompact(ipc08.de_nghi+ipc09.de_nghi)}</b> — dòng tiền chỉ cân đối được <i>nếu CĐT thanh toán đúng hạn</i>.`,
+  `Công nợ phải trả <b>thực tế đến hạn</b> (theo Kế hoạch thanh toán 26/06/2026) là <b>${fmtCompact(congNoTotal)}</b> trên 41 hoá đơn/bill đã phát sinh — trong đó Ưu tiên 1 (khẩn cấp, đa phần đã quá hạn) là ${fmtCompact(congNoP1)}, Ưu tiên 2 là ${fmtCompact(congNoP2)}; đối tác có công nợ lớn nhất là <b>${congNoTopVendor.ten}</b> với ${fmtCompact(congNoTopVendor.so_tien)}.`
+];
+insights.forEach(t=>{ const li=document.createElement('li'); li.innerHTML=t; insightList.appendChild(li); });
+
+/* ======================= KPI ======================= */
+document.getElementById('kpiThu').textContent = fmtCompact(totalThu);
+document.getElementById('kpiChi').textContent = fmtCompact(totalChi);
+const tonEl = document.getElementById('kpiTon');
+tonEl.textContent = (tonQuy<0?'−':'') + fmtCompact(Math.abs(tonQuy));
+tonEl.style.color = tonQuy<0 ? 'var(--danger)' : 'var(--success)';
+document.getElementById('kpiConThu').textContent = fmtCompact(conPhaiThu);
+document.getElementById('kpiConChi').textContent = fmtCompact(congNoTotal);
+document.getElementById('kpiDuTru').textContent = fmtCompact(grand.t7+grand.t8);
+
+/* ======================= CHART 1: THU theo tháng ======================= */
+const ctxThu = document.getElementById('chartThu').getContext('2d');
+const chartThu = new Chart(ctxThu, {
+  data:{
+    labels: thuChart.map(d=>monthLabel(d.thang)),
+    datasets:[
+      {type:'bar', label:'Giá trị đề nghị TT', data: thuChart.map(d=>d.de_nghi), backgroundColor:'#0EA5E9AA', borderRadius:4, order:2},
+      {type:'bar', label:'Đã thu thực tế', data: thuChart.map(d=>d.da_tt), backgroundColor:'#10B981', borderRadius:4, order:2},
+      {type:'line', label:'Lũy kế đã thu', data: thuChart.map(d=>d.cum_da_tt), borderColor:'#1E40AF', backgroundColor:'#1E40AF', yAxisID:'y1', tension:.3, pointRadius:3, order:1}
+    ]
+  },
+  options:{
+    responsive:true,
+    interaction:{mode:'index', intersect:false},
+    plugins:{
+      legend:{position:'bottom'},
+      tooltip:{callbacks:{label:(ctx)=> ctx.dataset.label+': '+fmtVND(ctx.raw)}}
+    },
+    scales:{
+      y:{ticks:{callback:v=>fmtAxisTy(v)}, title:{display:true,text:'Theo tháng (tỷ đồng)'}},
+      y1:{position:'right', grid:{drawOnChartArea:false}, ticks:{callback:v=>fmtAxisTy(v)}, title:{display:true,text:'Lũy kế (tỷ đồng)'}}
+    }
+  }
+});
+
+/* ======================= CHART 2: Cơ cấu Chi theo nhóm (donut) ======================= */
+const ctxCoCau = document.getElementById('chartCoCau').getContext('2d');
+const chartCoCau = new Chart(ctxCoCau, {
+  type:'doughnut',
+  data:{
+    labels: groupTotals.map(g=>g.nhom),
+    datasets:[{data: groupTotals.map(g=>g.da_tt), backgroundColor: COLORS, borderWidth:2, borderColor:'#fff'}]
+  },
+  options:{
+    plugins:{
+      legend:{position:'bottom', labels:{boxWidth:12, font:{size:11}}},
+      tooltip:{callbacks:{label:(ctx)=> ctx.label+': '+fmtVND(ctx.raw)+' ('+(ctx.raw/totalChi*100).toFixed(1)+'%)'}},
+      datalabels:{
+        display:true,
+        color:'#fff',
+        font:{weight:'700', size:13},
+        formatter:(value)=> (value/totalChi*100).toFixed(1)+'%'
+      }
+    },
+    onClick:(evt, els)=>{ if(els.length){ applyGroupFilter(groupTotals[els[0].index].nhom); } }
+  }
+});
+
+/* ======================= CHART 3: Dự phóng Thu vs Chi T7/T8 ======================= */
+const ctxDuPhong = document.getElementById('chartDuPhong').getContext('2d');
+new Chart(ctxDuPhong, {
+  type:'bar',
+  data:{
+    labels:['Tháng 7/2026','Tháng 8/2026'],
+    datasets:[
+      {label:'Thu dự kiến (IPC)', data:[ipc08.de_nghi, ipc09.de_nghi], backgroundColor:'#10B981', borderRadius:6},
+      {label:'Chi dự trù (NCC/NTP)', data:[grand.t7, grand.t8], backgroundColor:'#EF4444', borderRadius:6}
+    ]
+  },
+  options:{
+    plugins:{legend:{position:'bottom'}, tooltip:{callbacks:{label:(ctx)=>ctx.dataset.label+': '+fmtVND(ctx.raw)}}},
+    scales:{y:{ticks:{callback:v=>fmtAxisTy(v)}, title:{display:true,text:'Tỷ đồng'}}}
+  }
+});
+
+/* ======================= CHART 4: Kết cấu vs MEP (stacked) ======================= */
+const ctxKCM = document.getElementById('chartKetCauMep').getContext('2d');
+new Chart(ctxKCM, {
+  type:'bar',
+  data:{
+    labels:['Phần Kết cấu','Phần MEP'],
+    datasets:[
+      {label:'Đã thanh toán', data:[catA.da_tt, catB.da_tt], backgroundColor:'#10B981', stack:'s'},
+      {label:'Còn lại theo HĐ', data:[catA.con_lai, catB.con_lai], backgroundColor:'#F59E0B', stack:'s'}
+    ]
+  },
+  options:{
+    indexAxis:'y',
+    plugins:{legend:{position:'bottom'}, tooltip:{callbacks:{label:(ctx)=>ctx.dataset.label+': '+fmtVND(ctx.raw)}}},
+    scales:{x:{stacked:true, ticks:{callback:v=>fmtAxisTy(v)}, title:{display:true,text:'Tỷ đồng'}}, y:{stacked:true}}
+  }
+});
+
+/* ======================= CHART 5: Top 10 công nợ đến hạn (từ STELLA360_CONG NO.xlsx) ======================= */
+const top10CongNo = congNoByVendor.slice().sort((a,b)=>b.so_tien-a.so_tien).slice(0,10);
+new Chart(document.getElementById('chartTopNo').getContext('2d'), {
+  type:'bar',
+  data:{
+    labels: top10CongNo.map(v=> v.ten.length>28 ? v.ten.slice(0,26)+'…' : v.ten),
+    datasets:[{label:'Công nợ đến hạn', data: top10CongNo.map(v=>v.so_tien), backgroundColor:'#EF4444', borderRadius:4}]
+  },
+  options:{
+    indexAxis:'y',
+    plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>fmtVND(ctx.raw)}}},
+    scales:{x:{ticks:{callback:v=>fmtAxisTy(v)}, title:{display:true,text:'Tỷ đồng'}}}
+  }
+});
+
+/* ======================= FILTER STATE ======================= */
+let activeGroup = 'Tất cả';
+let searchTerm = '';
+
+const groupFilterWrap = document.getElementById('groupFilterWrap');
+['Tất cả', ...GROUP_ORDER].forEach(g=>{
+  const btn = document.createElement('button');
+  btn.textContent = g;
+  btn.className = 'chip-btn px-3 py-1.5 rounded-full border border-slate-300 text-xs font-medium bg-white' + (g==='Tất cả' ? ' active' : '');
+  btn.dataset.group = g;
+  btn.onclick = ()=> applyGroupFilter(g);
+  groupFilterWrap.appendChild(btn);
+});
+function applyGroupFilter(g){
+  activeGroup = g;
+  [...groupFilterWrap.children].forEach(b=> b.classList.toggle('active', b.dataset.group===g));
+  renderVendorTable();
+}
+
+document.getElementById('searchBox').addEventListener('input', (e)=>{
+  searchTerm = e.target.value.trim().toLowerCase();
+  renderVendorTable();
+});
+document.getElementById('btnReset').onclick = ()=>{
+  document.getElementById('searchBox').value=''; searchTerm='';
+  applyGroupFilter('Tất cả');
+};
+
+/* ======================= VENDOR TABLE ======================= */
+let sortKey = 'con_lai', sortDir = -1;
+document.querySelectorAll('th[data-sort]').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.sort;
+    if(sortKey===key) sortDir *= -1; else { sortKey = key; sortDir = -1; }
+    renderVendorTable();
+  });
+});
+
+function badgeForStatus(s){
+  if(!s) return '';
+  const low = s.toLowerCase();
+  if(low.includes('quyết toán')) return `<span class="badge" style="background:#DBEAFE;color:#1E40AF">${s}</span>`;
+  if(low.includes('rút khỏi') || low.includes('không tham gia')) return `<span class="badge" style="background:#FEE2E2;color:#991B1B">${s}</span>`;
+  if(low.includes('đã duyệt') || low.includes('đã up pms') || low.includes('đã thanh toán')) return `<span class="badge" style="background:#D1FAE5;color:#065F46">${s}</span>`;
+  return `<span class="text-slate-500 text-xs">${s}</span>`;
+}
+
+function renderVendorTable(){
+  let rows = CHI_VENDORS.slice();
+  if(activeGroup !== 'Tất cả') rows = rows.filter(v=>v.nhom===activeGroup);
+  if(searchTerm) rows = rows.filter(v=> v.ten.toLowerCase().includes(searchTerm) || v.nhom.toLowerCase().includes(searchTerm));
+  rows.sort((a,b)=> (a[sortKey]>b[sortKey]?1:a[sortKey]<b[sortKey]?-1:0) * sortDir);
+
+  const tbody = document.getElementById('vendorTbody');
+  tbody.innerHTML = '';
+  if(rows.length===0){
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">Không có dữ liệu phù hợp với bộ lọc này.</td></tr>`;
+  } else {
+    rows.forEach(v=>{
+      const tr = document.createElement('tr');
+      tr.className = 'border-t border-slate-100';
+      tr.innerHTML = `
+        <td class="px-3 py-2 font-medium text-slate-700">${v.ten}</td>
+        <td class="px-3 py-2 text-slate-500">${v.nhom}</td>
+        <td class="px-3 py-2 text-right">${v.gia_tri_hd ? fmtVND(v.gia_tri_hd) : '—'}</td>
+        <td class="px-3 py-2 text-right" style="color:var(--success)">${fmtVND(v.da_tt)}</td>
+        <td class="px-3 py-2 text-right font-semibold" style="color:${v.con_lai>0?'var(--accent)':'var(--muted)'}">${fmtVND(v.con_lai)}</td>
+        <td class="px-3 py-2 text-right">${v.du_tru_t7 ? fmtVND(v.du_tru_t7) : '—'}</td>
+        <td class="px-3 py-2 text-right">${v.du_tru_t8 ? fmtVND(v.du_tru_t8) : '—'}</td>
+        <td class="px-3 py-2">${badgeForStatus(v.trang_thai)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('vendorCount').textContent = `${rows.length} / ${CHI_VENDORS.length} nhà thầu/NCC`;
+}
+renderVendorTable();
+
+/* ======================= THU TABLE ======================= */
+function renderThuTable(){
+  const tbody = document.getElementById('thuTbody');
+  tbody.innerHTML='';
+  thuChart.forEach(d=>{
+    const daDu = d.da_tt >= d.de_nghi && (d.da_tt>0 || d.de_nghi===0);
+    const statusBadge = daDu
+      ? `<span class="badge" style="background:#D1FAE5;color:#065F46">Đã thu</span>`
+      : `<span class="badge" style="background:#FEE2E2;color:#991B1B">Chưa thu</span>`;
+    const tr = document.createElement('tr');
+    tr.className = 'border-t border-slate-100';
+    tr.innerHTML = `
+      <td class="px-3 py-2 font-medium">${d.ten}</td>
+      <td class="px-3 py-2">${monthLabel(d.thang)}</td>
+      <td class="px-3 py-2 text-right">${fmtVND(d.de_nghi)}</td>
+      <td class="px-3 py-2 text-right" style="color:var(--success)">${fmtVND(d.da_tt)}</td>
+      <td class="px-3 py-2 text-center">${statusBadge}</td>
+      <td class="px-3 py-2 text-slate-500 text-xs">${d.ghi_chu||''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+renderThuTable();
+
+/* ======================= CONG NO TABLE (thu gọn theo nhóm ưu tiên, bấm để bung ra) ======================= */
+const PRIORITY_GROUPS = [
+  {key:'1', label:'Ưu tiên 1 - Khẩn cấp', bg:'#FEE2E2', fg:'#991B1B', match:d=>d.uu_tien===1},
+  {key:'2', label:'Ưu tiên 2', bg:'#FEF3C7', fg:'#92400E', match:d=>d.uu_tien===2},
+  {key:'none', label:'Chưa xếp ưu tiên', bg:'#E2E8F0', fg:'#475569', match:d=>d.uu_tien===null}
+];
+let activePriority = 'all';
+let expandedGroups = new Set();
+
+const priorityFilterWrap = document.getElementById('priorityFilterWrap');
+[{key:'all', label:'Tất cả'}, ...PRIORITY_GROUPS].forEach(g=>{
+  const btn = document.createElement('button');
+  btn.textContent = g.label;
+  btn.className = 'chip-btn px-3 py-1.5 rounded-full border border-slate-300 text-xs font-medium bg-white' + (g.key==='all' ? ' active' : '');
+  btn.dataset.priority = g.key;
+  btn.onclick = ()=>{
+    activePriority = g.key;
+    [...priorityFilterWrap.children].forEach(b=> b.classList.toggle('active', b.dataset.priority===g.key));
+    // Chọn đúng 1 nhóm ưu tiên -> tự bung nhóm đó ra luôn; chọn "Tất cả" -> thu gọn lại hết
+    if(g.key==='all'){ expandedGroups.clear(); } else { expandedGroups = new Set([g.key]); }
+    renderCongNoTable();
+  };
+  priorityFilterWrap.appendChild(btn);
+});
+
+function renderCongNoTable(){
+  const tbody = document.getElementById('congNoTbody');
+  tbody.innerHTML = '';
+  const groupsToShow = activePriority==='all' ? PRIORITY_GROUPS : PRIORITY_GROUPS.filter(g=>g.key===activePriority);
+
+  groupsToShow.forEach(g=>{
+    const items = CONG_NO_ITEMS.filter(g.match).sort((a,b)=>b.so_tien-a.so_tien);
+    if(items.length===0) return;
+    const sum = items.reduce((s,d)=>s+d.so_tien,0);
+    const isOpen = expandedGroups.has(g.key);
+
+    const headerTr = document.createElement('tr');
+    headerTr.className = 'border-t border-slate-100 cursor-pointer hover:bg-slate-50 select-none';
+    headerTr.innerHTML = `
+      <td class="px-3 py-3 text-center text-slate-400">${isOpen ? '▾' : '▸'}</td>
+      <td class="px-3 py-3" colspan="2">
+        <span class="badge" style="background:${g.bg};color:${g.fg}">${g.label}</span>
+        <span class="text-slate-500 text-xs ml-2">${items.length} khoản</span>
+      </td>
+      <td class="px-3 py-3 text-right font-bold" style="color:var(--danger)">${fmtVND(sum)}</td>
+      <td class="px-3 py-3 text-slate-400 text-xs">${isOpen ? 'Bấm để thu gọn' : 'Bấm để xem chi tiết'}</td>`;
+    headerTr.onclick = ()=>{
+      if(expandedGroups.has(g.key)) expandedGroups.delete(g.key); else expandedGroups.add(g.key);
+      renderCongNoTable();
+    };
+    tbody.appendChild(headerTr);
+
+    if(isOpen){
+      items.forEach(d=>{
+        const tr = document.createElement('tr');
+        tr.className = 'border-t border-slate-50 bg-slate-50/40';
+        tr.innerHTML = `
+          <td class="px-3 py-2"></td>
+          <td class="px-3 py-2 font-medium text-slate-700">${VENDOR_NAME_MAP[d.ma_dt] || d.ma_dt}</td>
+          <td class="px-3 py-2 text-slate-600">${d.dien_giai}</td>
+          <td class="px-3 py-2 text-right" style="color:var(--danger)">${fmtVND(d.so_tien)}</td>
+          <td class="px-3 py-2 text-slate-500 text-xs">${d.note||''}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+  });
+
+  const shownCount = groupsToShow.reduce((s,g)=>s+CONG_NO_ITEMS.filter(g.match).length,0);
+  const shownSum = groupsToShow.reduce((s,g)=>s+CONG_NO_ITEMS.filter(g.match).reduce((s2,d)=>s2+d.so_tien,0),0);
+  document.getElementById('congNoCount').textContent = `${shownCount} khoản · Tổng ${fmtCompact(shownSum)}`;
+}
+renderCongNoTable();
+
+/* ======================= EXPORT CSV ======================= */
+document.getElementById('btnExportCsv').onclick = ()=>{
+  let rows = CHI_VENDORS.slice();
+  if(activeGroup !== 'Tất cả') rows = rows.filter(v=>v.nhom===activeGroup);
+  if(searchTerm) rows = rows.filter(v=> v.ten.toLowerCase().includes(searchTerm));
+  const header = ['Ten','Nhom','Gia tri HD','Da thanh toan','Con lai','Du tru T7','Du tru T8','Trang thai'];
+  const csvRows = [header.join(',')];
+  rows.forEach(v=>{
+    csvRows.push([v.ten, v.nhom, v.gia_tri_hd, v.da_tt, v.con_lai, v.du_tru_t7, v.du_tru_t8, '"'+(v.trang_thai||'').replace(/"/g,'""')+'"'].join(','));
+  });
+  const blob = new Blob(['﻿'+csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'STELLA360_ChiTiet_NCC_NTP.csv';
+  link.click();
+};
+</script>
+</body>
+</html>
