@@ -42,8 +42,8 @@
   <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
     <div>
       <div class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Công ty CP Đầu Tư Xây Dựng Vitecons</div>
-      <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mt-1">Dashboard Dòng Tiền Dự Án — STELLA360</h1>
-      <div class="text-sm text-slate-500 mt-1">Chung cư Ngôi Sao 360 · Thu (IPC/CĐT) đến 21/06/2026 · Giá trị hợp đồng Chi (NCC/NTP) đến 21/06/2026 · Công nợ phải trả theo Kế hoạch thanh toán 26/06/2026</div>
+      <h1 class="text-2xl md:text-3xl font-bold text-slate-900 mt-1">Dòng Tiền Dự Án — STELLA360</h1>
+      <div class="text-sm text-slate-500 mt-1">Chung cư Ngôi Sao 360 · Thu (IPC/CĐT) đến 21/06/2026 · Giá trị thanh toán Bill (NCC/NTP) đến 21/06/2026 · Công nợ phải trả theo Kế hoạch thanh toán 26/06/2026</div>
     </div>
     <div class="flex gap-2 no-print">
       <button onclick="window.print()" class="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium flex items-center gap-2">
@@ -64,7 +64,7 @@
   <!-- KPI CARDS -->
   <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
     <div class="card p-4">
-      <div class="text-xs text-slate-500 font-medium">Tổng THU (đã nhận từ CĐT)</div>
+      <div class="text-xs text-slate-500 font-medium">TỔNG THU (đã nhận từ CĐT)</div>
       <div id="kpiThu" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--success)">-</div>
       <div class="text-[11px] text-slate-400 mt-1">Lũy kế các đợt IPC đã thanh toán</div>
     </div>
@@ -74,22 +74,22 @@
       <div class="text-[11px] text-slate-400 mt-1">Lũy kế đến 21/06/2026</div>
     </div>
     <div class="card p-4">
-      <div class="text-xs text-slate-500 font-medium">Tồn quỹ lũy kế (Thu − Chi)</div>
+      <div class="text-xs text-slate-500 font-medium">TỒN QUỸ LŨY KẾ (Thu − Chi)</div>
       <div id="kpiTon" class="kpi-value text-xl md:text-2xl font-bold mt-1">-</div>
       <div class="text-[11px] text-slate-400 mt-1">Âm = đang bù bằng vốn khác</div>
     </div>
     <div class="card p-4">
-      <div class="text-xs text-slate-500 font-medium">Còn phải THU theo HĐ</div>
+      <div class="text-xs text-slate-500 font-medium">THU TIẾP THEO HĐ</div>
       <div id="kpiConThu" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--secondary)">-</div>
       <div class="text-[11px] text-slate-400 mt-1">Các đợt IPC chưa được CĐT chi trả</div>
     </div>
     <div class="card p-4">
-      <div class="text-xs text-slate-500 font-medium">Công nợ phải trả hiện tại</div>
+      <div class="text-xs text-slate-500 font-medium">CÔNG NỢ THANH TOÁN (CC/NTP)</div>
       <div id="kpiConChi" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--danger)">-</div>
       <div class="text-[11px] text-slate-400 mt-1">Hoá đơn/bill đã phát sinh, đến hạn TT (26/06/2026)</div>
     </div>
     <div class="card p-4">
-      <div class="text-xs text-slate-500 font-medium">Dự trù Chi T7+T8/2026</div>
+      <div class="text-xs text-slate-500 font-medium">DỰ TRÙ CHI T7+T8/2026</div>
       <div id="kpiDuTru" class="kpi-value text-xl md:text-2xl font-bold mt-1" style="color:var(--primary)">-</div>
       <div class="text-[11px] text-slate-400 mt-1">Kế hoạch thanh toán 2 tháng tới</div>
     </div>
@@ -99,14 +99,14 @@
   <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-6">
     <div class="card p-5 xl:col-span-8">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-800">Dòng tiền THU theo tháng — Đề nghị vs Đã thu (lũy kế)</h3>
+        <h3 class="font-semibold text-slate-800">Dòng tiền THU — ĐỀ NGHỊ - ĐÃ THU (lũy kế)</h3>
         <span class="text-[11px] text-slate-400">Nguồn: Bảng theo dõi Claim thanh toán IPC · Đơn vị: tỷ đồng</span>
       </div>
       <canvas id="chartThu" height="110"></canvas>
     </div>
     <div class="card p-5 xl:col-span-4">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-800">Cơ cấu CHI đã thanh toán theo nhóm</h3>
+        <h3 class="font-semibold text-slate-800">GIÁ TRỊ ĐÃ THANH TOÁN THEO NHÓM </h3>
       </div>
       <canvas id="chartCoCau" height="230"></canvas>
     </div>
@@ -114,14 +114,14 @@
 
   <!-- VỊ TRÍ 2: TABLE THU IPC -->
   <div class="card p-5 mb-6">
-    <h3 class="font-semibold text-slate-800 mb-3">Lịch trình Thu theo đợt IPC (Chủ đầu tư)</h3>
+    <h3 class="font-semibold text-slate-800 mb-3">KẾ HOẠCH THANH TOÁN IPC (Chủ đầu tư)</h3>
     <div class="overflow-x-auto max-h-[420px] overflow-y-auto border border-slate-100 rounded-lg">
       <table class="data-table w-full text-sm">
         <thead>
           <tr class="text-left text-slate-600">
             <th class="px-3 py-2">Đợt</th>
             <th class="px-3 py-2">Tháng</th>
-            <th class="px-3 py-2 text-right">Giá trị đề nghị TT</th>
+            <th class="px-3 py-2 text-right">Giá trị đề nghị thanh toán </th>
             <th class="px-3 py-2 text-right">Đã thu</th>
             <th class="px-3 py-2 text-center">Trạng thái</th>
             <th class="px-3 py-2">Ghi chú</th>
@@ -135,15 +135,15 @@
   <!-- VỊ TRÍ 3: CHARTS ROW 2 -->
   <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-6">
     <div class="card p-5 xl:col-span-4">
-      <h3 class="font-semibold text-slate-800 mb-3">Dự phóng Thu vs Chi — T7 &amp; T8/2026</h3>
+      <h3 class="font-semibold text-slate-800 mb-3">Dự trù Thu - Chi (T7 &amp; T8/2026) </h3>
       <canvas id="chartDuPhong" height="230"></canvas>
     </div>
     <div class="card p-5 xl:col-span-4">
-      <h3 class="font-semibold text-slate-800 mb-3">Phần Kết cấu vs Phần MEP (đã trả / còn lại theo HĐ)</h3>
+      <h3 class="font-semibold text-slate-800 mb-3">THANH TOÁN/CÒN LẠI THEO HĐ (Phần Kết cấu & MEP) </h3>
       <canvas id="chartKetCauMep" height="230"></canvas>
     </div>
     <div class="card p-5 xl:col-span-4">
-      <h3 class="font-semibold text-slate-800 mb-3">Top 10 công nợ đến hạn lớn nhất</h3>
+      <h3 class="font-semibold text-slate-800 mb-3">TOP 10 CÔNG NỢ ĐẾN HẠN THANH TOÁN </h3>
       <div class="text-[11px] text-slate-400 -mt-2 mb-2">Theo Kế hoạch thanh toán 26/06/2026</div>
       <canvas id="chartTopNo" height="230"></canvas>
     </div>
@@ -189,7 +189,7 @@
   <div class="card p-5 mb-6">
     <div class="flex items-center justify-between mb-3">
       <h3 class="font-semibold text-slate-800">Công nợ phải trả đến hạn — Kế hoạch thanh toán 26/06/2026</h3>
-      <span id="congNoCount" class="text-xs text-slate-400"></span>
+      <span id="congNoCount" class="text-xs text-slate-800"></span>
     </div>
     <div class="text-[13px] text-slate-500 mb-3">Danh sách hoá đơn/bill đã phát sinh (TK 3311 — Phải trả người bán), thực sự đang nợ và chờ thanh toán — khác với "Còn lại theo HĐ" ở bảng trên (là phần hợp đồng chưa xuất hoá đơn). Bấm vào từng nhóm để xem chi tiết.</div>
     <div class="flex flex-wrap gap-2 mb-4 no-print">
